@@ -2,6 +2,10 @@
  Hyprland smart window toggle script
 
  ```sh
+ yay -S hyptg-git
+```
+
+ ```sh
 Usage:
   hyprtogglewindow.sh [options] <launch_cmd> [window_class]
 
