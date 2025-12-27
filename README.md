@@ -1,5 +1,6 @@
 # hyptg
  Hyprland smart window toggle script
+ Intelligently switch floating windows to prevent overlapping floats and return to the previous tiled window workflow
 
  ```sh
  yay -S hyptg-git
