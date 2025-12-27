@@ -8,7 +8,7 @@
 
  ```sh
 Usage:
-  hyprtogglewindow.sh [options] <launch_cmd> [window_class]
+  hyptg [options] <launch_cmd> [window_class]
 
 Arguments:
   launch_cmd
