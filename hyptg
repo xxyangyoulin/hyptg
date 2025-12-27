@@ -12,7 +12,7 @@ print_help() {
 Hyprland smart window toggle script
 
 Usage:
-  hyprtogglewindow.sh [options] <launch_cmd> [window_class]
+  hyptg [options] <launch_cmd> [window_class]
 
 Arguments:
   launch_cmd
