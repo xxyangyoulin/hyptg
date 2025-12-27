@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# Hyprland smart window toggle script
+# Requires: hyprctl, jq
+
+set -euo pipefail
+
+#######################################
+# Help
+#######################################
+print_help() {
+    cat << 'EOF'
+Hyprland smart window toggle script
+
+Usage:
+  hyprtogglewindow.sh [options] <launch_cmd> [window_class]
+
+Arguments:
+  launch_cmd
+      Command used to launch the application (required)
+
+  window_class
+      Hyprland window class
+      Defaults to launch_cmd if not provided
+
+Options:
+  -c, --conflict <classes>
+      Floating window classes that conflict with the target window
+      Multiple classes separated by commas
+      Only affects the current workspace
+
+  -h, --help
+      Show this help message and exit
+EOF
+}
+
+#######################################
+# Argument parsing
+#######################################
+conflict_classes=""
+positionals=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            print_help
+            exit 0
+            ;;
+        -c|--conflict)
+            [[ -n "${2:-}" ]] || {
+                echo "Error: -c|--conflict requires an argument" >&2
+                exit 1
+            }
+            conflict_classes="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            positionals+=("$1")
+            shift
+            ;;
+    esac
+done
+
+[[ ${#positionals[@]} -ge 1 ]] || {
+    print_help
+    exit 1
+}
+
+launch_cmd="${positionals[0]}"
+win_class="${positionals[1]:-$launch_cmd}"
+
+#######################################
+# Current state
+#######################################
+active_window_json="$(hyprctl activewindow -j)"
+active_address="$(jq -r '.address' <<< "$active_window_json")"
+current_ws="$(hyprctl activeworkspace -j | jq -r '.id')"
+
+#######################################
+# Locate target window (first matched by class)
+# Note: if multiple windows share the same class,
+#       this keeps the original behavior
+#######################################
+target_window="$(
+    hyprctl clients -j |
+        jq -r --arg cls "$win_class" '
+            .[]
+            | select(.class == $cls)
+            | "\(.workspace.id) \(.address)"
+        ' |
+        head -n1
+)"
+
+#######################################
+# Not found → launch application
+#######################################
+if [[ -z "$target_window" ]]; then
+    setsid "$launch_cmd" >/dev/null 2>&1 &
+    exit 0
+fi
+
+read -r target_ws target_address <<< "$target_window"
+
+#######################################
+# Main logic
+#######################################
+if [[ "$target_ws" -ne "$current_ws" ]]; then
+    hyprctl --batch "
+        dispatch movetoworkspacesilent $current_ws,address:$target_address ;
+        dispatch focuswindow address:$target_address ;
+        dispatch bringactivetotop
+    "
+else
+    if [[ "$target_address" == "$active_address" ]]; then
+        last_address="$(
+            hyprctl clients -j |
+                jq -r --arg ws "$current_ws" --arg addr "$target_address" '
+                    [
+                        .[]
+                        | select(
+                            .workspace.id == ($ws|tonumber)
+                            and .address != $addr
+                        )
+                    ]
+                    | sort_by(.focusHistoryID)
+                    | .[0].address
+                '
+        )"
+
+        if [[ -n "$last_address" && "$last_address" != "null" ]]; then
+            hyprctl --batch "
+                dispatch focuswindow address:$last_address ;
+                dispatch movetoworkspacesilent special,address:$target_address
+            "
+        else
+            hyprctl dispatch movetoworkspacesilent "special,address:$target_address"
+        fi
+    else
+        hyprctl dispatch focuswindow "address:$target_address"
+        hyprctl dispatch bringactivetotop
+    fi
+fi
+
+#######################################
+# Hide conflicting floating windows
+#######################################
+if [[ -n "$conflict_classes" ]]; then
+    IFS=',' read -ra conflict_array <<< "$conflict_classes"
+
+    for cls in "${conflict_array[@]}"; do
+        floating_addresses="$(
+            hyprctl clients -j |
+                jq -r --arg cls "$cls" --arg ws "$current_ws" '
+                    .[]
+                    | select(
+                        .class == $cls
+                        and .floating == true
+                        and .workspace.id == ($ws|tonumber)
+                    )
+                    | .address
+                '
+        )"
+
+        for addr in $floating_addresses; do
+            # Skip the current target window
+            if [[ "$addr" == "$target_address" ]]; then
+                continue
+            fi
+
+            hyprctl dispatch movetoworkspacesilent "special,address:$addr"
+        done
+    done
+fi
