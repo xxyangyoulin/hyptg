@@ -102,7 +102,7 @@ target_window="$(
 # Not found → launch application
 #######################################
 if [[ -z "$target_window" ]]; then
-    setsid "$launch_cmd" >/dev/null 2>&1 &
+    setsid sh -c "$launch_cmd" >/dev/null 2>&1 &
     exit 0
 fi
 
