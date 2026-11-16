@@ -2,6 +2,8 @@
  Hyprland smart window toggle script  
  Intelligently switch floating windows to prevent overlapping floats and return to the previous tiled window workflow
 
+Requires Hyprland 0.55+ (Lua dispatchers) and jq. Switching to an existing window focuses it and brings it to the top.
+
  ```sh
  yay -S hyptg-git
 ```

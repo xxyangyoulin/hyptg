@@ -113,9 +113,9 @@ read -r target_ws target_address <<< "$target_window"
 #######################################
 if [[ "$target_ws" -ne "$current_ws" ]]; then
     hyprctl --batch "
-        dispatch movetoworkspacesilent $current_ws,address:$target_address ;
-        dispatch focuswindow address:$target_address ;
-        dispatch bringactivetotop
+        dispatch hl.dsp.window.move({ workspace = $current_ws, follow = false, window = 'address:$target_address' }) ;
+        dispatch hl.dsp.focus({ window = 'address:$target_address' }) ;
+        dispatch hl.dsp.window.bring_to_top()
     "
 else
     if [[ "$target_address" == "$active_address" ]]; then
@@ -136,15 +136,17 @@ else
 
         if [[ -n "$last_address" && "$last_address" != "null" ]]; then
             hyprctl --batch "
-                dispatch focuswindow address:$last_address ;
-                dispatch movetoworkspacesilent special,address:$target_address
+                dispatch hl.dsp.focus({ window = 'address:$last_address' }) ;
+                dispatch hl.dsp.window.move({ workspace = 'special', follow = false, window = 'address:$target_address' })
             "
         else
-            hyprctl dispatch movetoworkspacesilent "special,address:$target_address"
+            hyprctl dispatch "hl.dsp.window.move({ workspace = 'special', follow = false, window = 'address:$target_address' })"
         fi
     else
-        hyprctl dispatch focuswindow "address:$target_address"
-        hyprctl dispatch bringactivetotop
+        hyprctl --batch "
+            dispatch hl.dsp.focus({ window = 'address:$target_address' }) ;
+            dispatch hl.dsp.window.bring_to_top()
+        "
     fi
 fi
 
@@ -174,7 +176,7 @@ if [[ -n "$conflict_classes" ]]; then
                 continue
             fi
 
-            hyprctl dispatch movetoworkspacesilent "special,address:$addr"
+            hyprctl dispatch "hl.dsp.window.move({ workspace = 'special', follow = false, window = 'address:$addr' })"
         done
     done
 fi
